@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CloudQuiz - Create Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #00c6ff, #0072ff);
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      background: #fff;
+      padding: 30px;
+      border-radius: 18px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+      max-width: 600px;
+      width: 100%;
+      animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 25px;
+      font-size: 24px;
+    }
+
+    .question-block {
+      border: 2px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+    }
+
+    label {
+      color: #0072ff;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 12px;
+      display: block;
+    }
+
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 12px 14px;
+      margin-top: 6px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: 0.3s;
+    }
+
+    input[type="text"]:focus,
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #0072ff;
+      box-shadow: 0 0 6px rgba(0, 114, 255, 0.4);
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(to right, #0072ff, #00c6ff);
+      color: #fff;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: transform 0.2s, box-shadow 0.3s;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 114, 255, 0.4);
+    }
+
+    #quizLink {
+      margin-top: 25px;
+      text-align: center;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    #quizLink a {
+      color: #0072ff;
+      text-decoration: none;
+      word-break: break-word;
+    }
+
+    #quizLink a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>📘 Create a Quiz</h2>
+    <div id="questionContainer"></div>
+    <button onclick="addQuestion()">+ Add Question</button>
+    <button onclick="createQuiz()">🚀 Create Quiz</button>
+    <p id="quizLink"></p>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc
+    } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyABAGf8EbZ-NSGvtHMTyTfRzlBJgSUgMIk",
+      authDomain: "quzizz-5caac.firebaseapp.com",
+      projectId: "quzizz-5caac",
+      storageBucket: "quzizz-5caac.appspot.com",
+      messagingSenderId: "884054211856",
+      appId: "1:884054211856:web:4015ea51e637d8b620b995",
+      measurementId: "G-HZ988SZQRF"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const questionContainer = document.getElementById("questionContainer");
+
+    window.addQuestion = function () {
+      const div = document.createElement("div");
+      div.className = "question-block";
+      div.innerHTML = `
+        <label>Question:</label>
+        <input type="text" class="question-input" placeholder="Enter question here">
+
+        <label>Option 1:</label>
+        <input type="text" class="option-input" placeholder="Option 1">
+        <label>Option 2:</label>
+        <input type="text" class="option-input" placeholder="Option 2">
+        <label>Option 3:</label>
+        <input type="text" class="option-input" placeholder="Option 3">
+        <label>Option 4:</label>
+        <input type="text" class="option-input" placeholder="Option 4">
+
+        <label>Correct Option (1-4):</label>
+        <input type="number" class="correct-input" min="1" max="4">
+      `;
+      questionContainer.appendChild(div);
+    };
+
+    window.createQuiz = async function () {
+      const blocks = document.querySelectorAll(".question-block");
+      const questions = [];
+
+      for (const block of blocks) {
+        const question = block.querySelector(".question-input").value.trim();
+        const options = Array.from(block.querySelectorAll(".option-input")).map(o => o.value.trim());
+        const correctIndex = parseInt(block.querySelector(".correct-input").value.trim()) - 1;
+
+        if (!question || options.some(o => !o) || isNaN(correctIndex) || correctIndex < 0 || correctIndex > 3) {
+          alert("Please fill all fields correctly in every question.");
+          return;
+        }
+
+        questions.push({ question, options, correctIndex });
+      }
+
+      const docRef = await addDoc(collection(db, "quizzes"), {
+        questions,
+        responses: []
+      });
+
+      document.getElementById("quizLink").innerHTML = `
+        ✅ Quiz created!<br>
+        <a href="play.html?id=${docRef.id}" target="_blank">
+          play.html?id=${docRef.id}
+        </a>
+      `;
+    };
+
+    // Add one question block by default
+    addQuestion();
+  </script>
+</body>
+</html>

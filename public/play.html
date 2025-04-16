@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>CloudQuiz - Play</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(135deg, #d0f1ff, #a2d4ff);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background: #ffffff;
+      padding: 40px 30px;
+      border-radius: 18px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 500px;
+      animation: fadeIn 0.6s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h2, h3 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 14px;
+      margin-bottom: 20px;
+      font-size: 16px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(to right, #0072ff, #00c6ff);
+      color: #fff;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.3s;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0, 114, 255, 0.3);
+    }
+
+    .hidden { display: none; }
+
+    #optionsContainer {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .timer {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 20px;
+      text-align: center;
+      color: #0072ff;
+    }
+
+    #leaderboardList {
+      list-style: none;
+      padding: 0;
+    }
+
+    #leaderboardList li {
+      background: #f5faff;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 8px;
+      font-weight: 500;
+      color: #333;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Welcome to CloudQuiz</h2>
+
+    <!-- Name Input Section -->
+    <div id="nameSection">
+      <input type="text" id="studentName" placeholder="Enter your name" />
+      <button onclick="startQuiz()">Start Quiz</button>
+    </div>
+
+    <!-- Quiz Section -->
+    <div id="quizSection" class="hidden">
+      <p id="timer" class="timer">Time Left: 40</p>
+      <p id="questionText"></p>
+      <div id="optionsContainer"></div>
+    </div>
+
+    <!-- Leaderboard Section -->
+    <div id="leaderboardSection" class="hidden">
+      <h3>Leaderboard</h3>
+      <ul id="leaderboardList"></ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js";
+    import {
+      getFirestore,
+      doc,
+      getDoc,
+      updateDoc,
+      arrayUnion
+    } from "https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyABAGf8EbZ-NSGvtHMTyTfRzlBJgSUgMIk",
+      authDomain: "quzizz-5caac.firebaseapp.com",
+      projectId: "quzizz-5caac",
+      storageBucket: "quzizz-5caac.appspot.com",
+      messagingSenderId: "884054211856",
+      appId: "1:884054211856:web:4015ea51e637d8b620b995",
+      measurementId: "G-HZ988SZQRF"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let quizId = new URLSearchParams(window.location.search).get("id");
+    let questions = [];
+    let currentIndex = 0;
+    let studentName = "";
+    let score = 0;
+    let startTime;
+    let timerInterval;
+
+    const nameSection = document.getElementById("nameSection");
+    const quizSection = document.getElementById("quizSection");
+    const leaderboardSection = document.getElementById("leaderboardSection");
+    const timerElement = document.getElementById("timer");
+    const questionText = document.getElementById("questionText");
+    const optionsContainer = document.getElementById("optionsContainer");
+    const leaderboardList = document.getElementById("leaderboardList");
+
+    window.startQuiz = async function () {
+      studentName = document.getElementById("studentName").value.trim();
+      if (!studentName) return alert("Please enter your name");
+
+      const docRef = doc(db, "quizzes", quizId);
+      const quizSnap = await getDoc(docRef);
+
+      if (!quizSnap.exists()) {
+        return alert("Quiz not found");
+      }
+
+      questions = quizSnap.data().questions;
+      nameSection.classList.add("hidden");
+      quizSection.classList.remove("hidden");
+
+      currentIndex = 0;
+      score = 0;
+      showQuestion();
+    };
+
+    function showQuestion() {
+      if (currentIndex >= questions.length) {
+        return finishQuiz();
+      }
+
+      const q = questions[currentIndex];
+      questionText.textContent = q.question;
+      optionsContainer.innerHTML = "";
+
+      startTime = Date.now();
+      startTimer();
+
+      q.options.forEach((opt, index) => {
+        const btn = document.createElement("button");
+        btn.textContent = opt;
+        btn.onclick = () => selectAnswer(index, q.correctIndex);
+        optionsContainer.appendChild(btn);
+      });
+    }
+
+    function startTimer() {
+      let timeLeft = 40;
+      timerElement.textContent = "Time Left: 40";
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft--;
+        timerElement.textContent = "Time Left: " + timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          selectAnswer(-1, questions[currentIndex].correctIndex);
+        }
+      }, 1000);
+    }
+
+    async function selectAnswer(selected, correct) {
+      clearInterval(timerInterval);
+      const timeTaken = (Date.now() - startTime) / 1000;
+
+      if (selected === correct) {
+        const points = Math.max(0, 40 - Math.floor(timeTaken));
+        score += points;
+      }
+
+      currentIndex++;
+      showQuestion();
+    }
+
+    async function finishQuiz() {
+      quizSection.classList.add("hidden");
+      leaderboardSection.classList.remove("hidden");
+
+      const quizRef = doc(db, "quizzes", quizId);
+      await updateDoc(quizRef, {
+        responses: arrayUnion({ name: studentName, score })
+      });
+
+      leaderboardList.innerHTML = `<li>${studentName}: ${score} pts</li>`;
+    }
+  </script>
+</body>
+</html>
